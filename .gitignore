@@ -1,0 +1,8 @@
+#text files
+*.txt
+
+#binary
+*.bin
+
+#zip
+*.gz

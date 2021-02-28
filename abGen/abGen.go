@@ -2,10 +2,15 @@ package main
 
 import (
 	"bufio"
+	"compress/gzip"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -18,6 +23,8 @@ import (
 // 	B []uint64
 // )
 
+type dataEncoderFunc func(io.Writer, []uint64) (int, error)
+
 type GoldbachTables struct {
 	Primes []uint64
 	A      []uint64
@@ -25,48 +32,95 @@ type GoldbachTables struct {
 }
 
 var (
-	fPrimeStr = "primes.txt"
-	fAStr     = "A.txt"
-	fBStr     = "B.txt"
+	fPrimeStr = "tables/primes.txt"
+	fAStr     = "tables/A.txt"
+	fBStr     = "tables/B.txt"
+
+	fPrimeBin = "primes.bin"
+	fABin     = "A.bin"
+	fBBin     = "B.bin"
 )
+
+var start time.Time
 
 func main() {
 	fmt.Println("abGen - генерация номеров A- и B- простых чисел")
-	const max = 100000000
+	const max = 30000000
 	gt := GoldbachTables{}
-	start := time.Now()
+	start = time.Now()
 	gt.primeGen(max)
 	end := time.Now().Sub(start)
 	fmt.Printf("Простых чисел от 5 до %d: %d\n", max, len(gt.Primes))
 	// fmt.Println(gt.Primes)
 	fmt.Printf("Количество альфа-простых: %d\n", len(gt.A))
 	fmt.Printf("Количество бета-простых: %d\n", len(gt.B))
-	fmt.Printf("\nВыполнено за %v сек. Средняя скорость обработки %v чисел в миллисекунду", end.Seconds(), max/end.Milliseconds())
+	fmt.Printf("\nВыполнено за %v Средняя скорость обработки %v чисел в миллисекунду\n", end.Round(time.Second), max/end.Milliseconds())
 
-	writeData(fPrimeStr, gt.Primes)
-	writeData(fAStr, gt.A)
-	writeData(fBStr, gt.B)
+	// writeZipData(fPrimeStr, gt.Primes, encodeText)
+	// writeZipData(fAStr, gt.A, encodeText)
+	// writeZipData(fBStr, gt.B, encodeText)
+	writeZipData(fPrimeBin, gt.Primes, encodeBin)
+	writeZipData(fABin, gt.A, encodeBin)
+	writeZipData(fBBin, gt.B, encodeBin)
 
 }
 
-func writeData(filename string, data []uint64) {
+func writeZipData(filename string, data []uint64, encode dataEncoderFunc) {
+	zipName := strings.TrimSuffix(filename, filepath.Ext(filename)) + ".gz"
+	f, err := os.Create(zipName)
+	check(err)
+	defer f.Close()
+	zw := gzip.NewWriter(f)
+	zw.Name = filepath.Base(filename)
+	n, err := encode(zw, data)
+	check(err)
+	zw.Close()
+	err = zw.Flush()
+	check(err)
+	log.Printf("%d bytes written to %s", n, filename)
+}
+
+func writeData(filename string, data []uint64, encode dataEncoderFunc) {
 	f, err := os.Create(filename)
 	check(err)
 	defer f.Close()
 
 	w := bufio.NewWriter(f)
-	for i, b := range data {
-		_, err := fmt.Fprintf(w, "%d", b)
-		check(err)
-		if i != len(data)-1 {
-			_, err := w.WriteString(" ")
-			check(err)
-		}
-	}
-	log.Printf("Writing %v bytes to %s\n", w.Size(), filename)
+	n, err := encode(w, data)
 	err = w.Flush()
 	check(err)
-	log.Println("Done")
+	log.Printf("%d bytes written to %s", n, filename)
+}
+
+func encodeText(w io.Writer, data []uint64) (count int, err error) {
+	for i, b := range data {
+		n, err := fmt.Fprintf(w, "%d", b)
+		count += n
+		if err != nil {
+			return count, err
+		}
+		if i != len(data)-1 {
+			n, err := fmt.Fprint(w, " ")
+			count += n
+			if err != nil {
+				return count, err
+			}
+		}
+	}
+	return count, err
+}
+
+func encodeBin(w io.Writer, data []uint64) (count int, err error) {
+	b := make([]byte, 8)
+	for _, num := range data {
+		binary.BigEndian.PutUint64(b, num)
+		n, err := w.Write(b)
+		count += n
+		if err != nil {
+			return count, err
+		}
+	}
+	return count, err
 }
 
 func check(err error) {
@@ -89,9 +143,30 @@ func (gt *GoldbachTables) primeGen(max uint64) {
 			addition = isBeta // select 'beta' addition for the next check
 		}
 	}
+
+	// This goroutine calculates time left and prints progress of calculating and estimated time
+	q := make(chan int)
+	go func(quit chan int) {
+		var nOld uint64
+		for {
+			select {
+			case <-quit:
+				return
+			default:
+				interval := time.Second
+				time.Sleep(interval)
+				elasped := time.Now().Sub(start)
+
+				timeLeft := time.Duration(int64((max-n)/(n-nOld)) * time.Second.Nanoseconds())
+				fmt.Printf("%v%% complete, elasped time %v sec., time left %v     \r", n*100/max, elasped.Truncate(time.Second), timeLeft.Truncate(time.Second))
+				nOld = n
+			}
+		}
+
+	}(q)
+
 	for n+addition < max {
 		n += addition // add to the last known prime 2 or 4
-		fmt.Printf("n=%d\r", n)
 		if gt.isPrime(n) {
 			gt.Primes = append(gt.Primes, n)
 			if addition == isAlpha {
@@ -106,7 +181,11 @@ func (gt *GoldbachTables) primeGen(max uint64) {
 			addition = isAlpha
 		}
 	}
+
+	q <- 0
+	fmt.Printf("%s\r", string(80*' '))
 }
+
 func (gt *GoldbachTables) isPrime(n uint64) bool {
 	if len(gt.Primes) == 0 {
 		if n == 5 {
