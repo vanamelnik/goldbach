@@ -40,11 +40,27 @@ func main() {
 	fmt.Println("OK")
 
 	fmt.Printf("\nThere are %d prime numbers in the table\n", len(primes))
-	fmt.Printf("Last five primes is: %v\n", primes[len(primes)-5:])
+	// fmt.Printf("Last five primes is: %v\n", primes[len(primes)-5:])
 	fmt.Printf("\nThere are %d alpha prime indexes in the table\n", len(A))
-	fmt.Printf("Last five indexes is: %v\n", A[len(A)-5:])
+	// fmt.Printf("Last five indexes is: %v\n", A[len(A)-5:])
 	fmt.Printf("\nThere are %d beta prime indexes in the table\n", len(B))
-	fmt.Printf("Last five indexes is: %v\n", B[len(B)-5:])
+	// fmt.Printf("Last five indexes is: %v\n", B[len(B)-5:])
+
+	const maxN = 100
+	for n := 5; n <= maxN; n++ {
+		p := (n - 1) / 2
+		fmt.Printf("N=%d", n)
+		for i := 1; i <= p; i++ {
+			// fmt.Printf("\t%d\t%d\t", i, n-i)
+			if !(binarySearch(A, uint64(i)) && binarySearch(A, uint64(n-i))) {
+				p--
+				// fmt.Println()
+			} else {
+				// fmt.Println("OK")
+			}
+		}
+		fmt.Printf("OK = %d\n", p)
+	}
 }
 
 func unzipFile(name string) ([]uint64, error) {
@@ -68,8 +84,7 @@ func unzipFile(name string) ([]uint64, error) {
 			return nil, err
 		}
 		count += n
-		// fmt.Printf("%v bytes read from %s\n", n, name)
-		for i := 0; i < n/8; i += 8 {
+		for i := 0; i < n; i += 8 {
 			num := binary.BigEndian.Uint64(buf[i:])
 			data = append(data, num)
 		}
@@ -79,4 +94,22 @@ func unzipFile(name string) ([]uint64, error) {
 	}
 
 	return data, nil
+}
+
+func binarySearch(data []uint64, x uint64) bool {
+	max, min := len(data), 0
+	i := max / 2
+	for x != data[i] {
+		// fmt.Printf("min:%d, max:%d, i:%d\n", min, max, i)
+		if min == max-1 {
+			return false
+		} else if x < data[i] {
+			max = i
+			i = min + (i-min)/2
+		} else {
+			min = i
+			i += (max - i) / 2
+		}
+	}
+	return true
 }

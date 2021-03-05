@@ -36,7 +36,7 @@ var start time.Time
 
 func main() {
 	fmt.Println("abGen - генерация номеров A- и B- простых чисел")
-	const max = 1000000000
+	const max = 10000000
 	capacity := max / int(math.Log(float64(max))) // pi(x) ~ x/log(x)
 	fmt.Printf("Поиск простых чисел в интервале 5 - %d. Pi(x) ~ %d\n", max, capacity)
 	gt := GoldbachTables{
@@ -50,7 +50,9 @@ func main() {
 	fmt.Printf("Простых чисел от 5 до %d: %d\n", max, len(gt.Primes))
 	fmt.Printf("Количество альфа-простых: %d\n", len(gt.A))
 	fmt.Printf("Количество бета-простых: %d\n", len(gt.B))
-	fmt.Printf("\nВыполнено за %v Средняя скорость обработки %v чисел в миллисекунду\n", end.Round(time.Second), max/end.Milliseconds())
+	if end.Microseconds() != 0 {
+		fmt.Printf("\nВыполнено за %v Средняя скорость обработки %v чисел в миллисекунду\n", end.Round(time.Second), max/end.Milliseconds())
+	}
 
 	// writeZipData(fPrimeStr, gt.Primes, encodeText)
 	// writeZipData(fAStr, gt.A, encodeText)
