@@ -14,15 +14,6 @@ import (
 	"time"
 )
 
-// var (
-// 	// Primes - slice of prime numbers >= 5
-// 	Primes []uint64
-// 	// A - slice of k-numbers of alpha-primes (6k-1)
-// 	A []uint64
-// 	// B - slice of k-numbers of beta-primes (6k+1)
-// 	B []uint64
-// )
-
 type dataEncoderFunc func(io.Writer, []uint64) (int, error)
 
 type GoldbachTables struct {
@@ -36,22 +27,27 @@ var (
 	fAStr     = "tables/A.txt"
 	fBStr     = "tables/B.txt"
 
-	fPrimeBin = "primes.bin"
-	fABin     = "A.bin"
-	fBBin     = "B.bin"
+	fPrimeBin = "tables/primes.bin"
+	fABin     = "tables/A.bin"
+	fBBin     = "tables/B.bin"
 )
 
 var start time.Time
 
 func main() {
 	fmt.Println("abGen - генерация номеров A- и B- простых чисел")
-	const max = 30000000
-	gt := GoldbachTables{}
+	const max = 1000000000
+	capacity := max / int(math.Log(float64(max))) // pi(x) ~ x/log(x)
+	fmt.Printf("Поиск простых чисел в интервале 5 - %d. Pi(x) ~ %d\n", max, capacity)
+	gt := GoldbachTables{
+		Primes: make([]uint64, 0, capacity),
+		A:      make([]uint64, 0, capacity/2),
+		B:      make([]uint64, 0, capacity/2),
+	}
 	start = time.Now()
 	gt.primeGen(max)
 	end := time.Now().Sub(start)
 	fmt.Printf("Простых чисел от 5 до %d: %d\n", max, len(gt.Primes))
-	// fmt.Println(gt.Primes)
 	fmt.Printf("Количество альфа-простых: %d\n", len(gt.A))
 	fmt.Printf("Количество бета-простых: %d\n", len(gt.B))
 	fmt.Printf("\nВыполнено за %v Средняя скорость обработки %v чисел в миллисекунду\n", end.Round(time.Second), max/end.Milliseconds())
@@ -144,6 +140,9 @@ func (gt *GoldbachTables) primeGen(max uint64) {
 		}
 	}
 
+	interval := time.Second
+	tick := time.Tick(interval)
+
 	// This goroutine calculates time left and prints progress of calculating and estimated time
 	q := make(chan int)
 	go func(quit chan int) {
@@ -152,17 +151,13 @@ func (gt *GoldbachTables) primeGen(max uint64) {
 			select {
 			case <-quit:
 				return
-			default:
-				interval := time.Second
-				time.Sleep(interval)
-				elasped := time.Now().Sub(start)
-
+			case <-tick:
+				elapsed := time.Now().Sub(start)
 				timeLeft := time.Duration(int64((max-n)/(n-nOld)) * time.Second.Nanoseconds())
-				fmt.Printf("%v%% complete, elasped time %v sec., time left %v     \r", n*100/max, elasped.Truncate(time.Second), timeLeft.Truncate(time.Second))
+				fmt.Printf("%v%% complete, elapsed time %v sec., time left %v     \r", n*100/max, elapsed.Truncate(time.Second), timeLeft.Truncate(time.Second))
 				nOld = n
 			}
 		}
-
 	}(q)
 
 	for n+addition < max {
@@ -183,6 +178,7 @@ func (gt *GoldbachTables) primeGen(max uint64) {
 	}
 
 	q <- 0
+	time.Sleep(time.Millisecond)
 	fmt.Printf("%s\r", string(80*' '))
 }
 
