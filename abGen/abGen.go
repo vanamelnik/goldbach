@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+const max = 5000000000
+
 type dataEncoderFunc func(io.Writer, []uint64) (int, error)
 
 type GoldbachTables struct {
@@ -36,7 +38,6 @@ var start time.Time
 
 func main() {
 	fmt.Println("abGen - генерация номеров A- и B- простых чисел")
-	const max = 10000000
 	capacity := max / int(math.Log(float64(max))) // pi(x) ~ x/log(x)
 	fmt.Printf("Поиск простых чисел в интервале 5 - %d. Pi(x) ~ %d\n", max, capacity)
 	gt := GoldbachTables{
@@ -154,10 +155,13 @@ func (gt *GoldbachTables) primeGen(max uint64) {
 			case <-quit:
 				return
 			case <-tick:
-				elapsed := time.Now().Sub(start)
-				timeLeft := time.Duration(int64((max-n)/(n-nOld)) * time.Second.Nanoseconds())
-				fmt.Printf("%v%% complete, elapsed time %v sec., time left %v     \r", n*100/max, elapsed.Truncate(time.Second), timeLeft.Truncate(time.Second))
-				nOld = n
+				if nOld != n {
+					elapsed := time.Now().Sub(start)
+					timeLeft := time.Duration(int64((max-n)/(n-nOld)) * time.Second.Nanoseconds())
+					fmt.Printf("%d%% complete, elapsed time %v sec., time left %v, speed %d nums/s    \r",
+						uint64(float64(n)/float64(max)*100), elapsed.Truncate(time.Second), timeLeft.Truncate(time.Second), n-nOld)
+					nOld = n
+				}
 			}
 		}
 	}(q)
