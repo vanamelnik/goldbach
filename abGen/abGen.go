@@ -14,15 +14,15 @@ import (
 	"time"
 )
 
-const max = 5000000000
+const max = 1000
 
 type dataEncoderFunc func(io.Writer, []uint64) (int, error)
 
-type GoldbachTables struct {
+var (
 	Primes []uint64
 	A      []uint64
 	B      []uint64
-}
+)
 
 var (
 	fPrimeStr = "tables/primes.txt"
@@ -40,27 +40,26 @@ func main() {
 	fmt.Println("abGen - генерация номеров A- и B- простых чисел")
 	capacity := max / int(math.Log(float64(max))) // pi(x) ~ x/log(x)
 	fmt.Printf("Поиск простых чисел в интервале 5 - %d. Pi(x) ~ %d\n", max, capacity)
-	gt := GoldbachTables{
-		Primes: make([]uint64, 0, capacity),
-		A:      make([]uint64, 0, capacity/2),
-		B:      make([]uint64, 0, capacity/2),
-	}
+	Primes = make([]uint64, 0, capacity)
+	A = make([]uint64, 0, capacity/2)
+	B = make([]uint64, 0, capacity/2)
+
 	start = time.Now()
-	gt.primeGen(max)
+	primeGen(max)
 	end := time.Now().Sub(start)
-	fmt.Printf("Простых чисел от 5 до %d: %d\n", max, len(gt.Primes))
-	fmt.Printf("Количество альфа-простых: %d\n", len(gt.A))
-	fmt.Printf("Количество бета-простых: %d\n", len(gt.B))
+	fmt.Printf("Простых чисел от 5 до %d: %d\n", max, len(Primes))
+	fmt.Printf("Количество альфа-простых: %d\n", len(A))
+	fmt.Printf("Количество бета-простых: %d\n", len(B))
 	if end.Microseconds() != 0 {
 		fmt.Printf("\nВыполнено за %v Средняя скорость обработки %v чисел в миллисекунду\n", end.Round(time.Second), max/end.Milliseconds())
 	}
 
-	// writeZipData(fPrimeStr, gt.Primes, encodeText)
-	// writeZipData(fAStr, gt.A, encodeText)
-	// writeZipData(fBStr, gt.B, encodeText)
-	writeZipData(fPrimeBin, gt.Primes, encodeBin)
-	writeZipData(fABin, gt.A, encodeBin)
-	writeZipData(fBBin, gt.B, encodeBin)
+	// writeZipData(fPrimeStr, Primes, encodeText)
+	// writeZipData(fAStr, A, encodeText)
+	// writeZipData(fBStr, B, encodeText)
+	writeZipData(fPrimeBin, Primes, encodeBin)
+	writeZipData(fABin, A, encodeBin)
+	writeZipData(fBBin, B, encodeBin)
 
 }
 
@@ -129,16 +128,16 @@ func check(err error) {
 }
 
 // TODO: add comments!
-func (gt *GoldbachTables) primeGen(max uint64) {
+func primeGen(max uint64) {
 	const (
 		isAlpha = 4
 		isBeta  = 2
 	)
 	var addition uint64 = isAlpha
 	var n uint64 = 1
-	if len(gt.Primes) > 0 {
-		n = gt.Primes[len(gt.Primes)-1] // n is the last known prime or 1
-		if (n+1)%6 == 0 {               // if the last prime in table is an alpha-prime,
+	if len(Primes) > 0 {
+		n = Primes[len(Primes)-1] // n is the last known prime or 1
+		if (n+1)%6 == 0 {         // if the last prime in table is an alpha-prime,
 			addition = isBeta // select 'beta' addition for the next check
 		}
 	}
@@ -168,12 +167,12 @@ func (gt *GoldbachTables) primeGen(max uint64) {
 
 	for n+addition < max {
 		n += addition // add to the last known prime 2 or 4
-		if gt.isPrime(n) {
-			gt.Primes = append(gt.Primes, n)
+		if isPrime(n) {
+			Primes = append(Primes, n)
 			if addition == isAlpha {
-				gt.A = append(gt.A, (n+1)/6) // new alpha-prime (6k-1), add k to table A
+				A = append(A, (n+1)/6) // new alpha-prime (6k-1), add k to table A
 			} else {
-				gt.B = append(gt.B, (n-1)/6) // new beta-prime (6k+1), add k to table B
+				B = append(B, (n-1)/6) // new beta-prime (6k+1), add k to table B
 			}
 		}
 		if addition == isAlpha {
@@ -188,15 +187,15 @@ func (gt *GoldbachTables) primeGen(max uint64) {
 	fmt.Printf("%s\r", string(80*' '))
 }
 
-func (gt *GoldbachTables) isPrime(n uint64) bool {
-	if len(gt.Primes) == 0 {
+func isPrime(n uint64) bool {
+	if len(Primes) == 0 {
 		if n == 5 {
 			return true
 		}
 		return false
 	}
-	for i := 0; gt.Primes[i] <= uint64(math.Sqrt(float64(n))); i++ {
-		if n%gt.Primes[i] == 0 {
+	for i := 0; Primes[i] <= uint64(math.Sqrt(float64(n))); i++ {
+		if n%Primes[i] == 0 {
 			return false
 		}
 	}
